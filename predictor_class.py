@@ -3,6 +3,8 @@ import tensorflow as tf
 import pandas as pd
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
+import alive_progress
+import time
 
 #predictor class
 #training_data = [np.array(training), np.array(labels)], lyrs = [layers.], raw_data - indicators(dataframe)
@@ -14,23 +16,26 @@ class predictor:
         self.scope = scope
         self.lrs = lrs
         if model_type == 'standard':
-          self.model = tf.keras.Sequential()
-          for each in self.lrs: self.model.add(each)
-          self.model.compile(optimizer = self.optimizer, loss = self.loss)
+            self.model = tf.keras.Sequential()
+            for each in self.lrs: self.model.add(each)
+            self.model.compile(optimizer = self.optimizer, loss = self.loss)
           
         else:
-          self.model = model_type #not a str definetely
+            self.model = model_type #not a str definetely
 
-    def train(self, training_data, labels, epochs=100):
-       self.model.fit(x=training_data, y=labels, epochs=epochs, shuffle=True)
+    def train(self, training_data, labels, epochs=100, verbose=True, callbacks=None):
+       self.model.fit(x=training_data, y=labels, epochs=epochs, shuffle=True, verbose=verbose, callbacks=callbacks)
 
     def examine_bias(self, raw_data, training_data, labels):
       predicts = [] 
       biases = []
-      for i in range(len(labels)-1):
-        prediction = self.pred(training_data[i:i+1])
-        predicts.append(prediction)
-        biases.append((labels[i] - prediction)/prediction)
+      with alive_progress.alive_bar(len(labels)-1, force_tty=True, spinner='radioactive') as bar: 
+        for i in range(len(labels)-1):
+          time.sleep(0.005)
+          prediction = self.pred(training_data[i:i+1])
+          predicts.append(prediction)
+          biases.append((labels[i] - prediction)/prediction)
+          bar()
 
       predicts = np.array(predicts)
       predicts = np.append(np.array([None]*(len(raw_data) - len(training_data) + 1)), np.reshape(predicts, (predicts.shape[0], )))
@@ -61,8 +66,8 @@ class predictor:
       
       plt.plot(ps)
       plt.plot(ins.close.values)
-      plt.show()
-    
+      plt.show()         
+
 
 ## methods for data engineering
 def calcMACD(data):  #this counts the key statistical indicator for the strategy. MACD in my case
@@ -90,14 +95,15 @@ def get_trainingdata(indicators, scope=1):
   labels = []
   training_full = []
   for i in range(0, len(indicators)-5-scope):
-    ins = pd.DataFrame([indicators[i:i+5].open,
-                        indicators[i:i+5].close,
-                        indicators[i:i+5].high,
-                        indicators[i:i+5].low,
-                        indicators[i:i+5].macdhist,
-                        indicators[i:i+5].ma20,
-                        indicators[i:i+5].ma50])
-
+    o = indicators[i:i+5].open
+    c = indicators[i:i+5].close
+    h = indicators[i:i+5].high
+    l = indicators[i:i+5].low
+    macd = indicators[i:i+5].macdhist
+    ma20 = indicators[i:i+5].ma20
+    ma50 = indicators[i:i+5].ma50
+    ins = pd.DataFrame([o,c,h,l,macd,ma20,ma50])                       
+                        
     y = indicators.close[i+5+scope-1]
     pic = np.reshape(ins.values, (5, 7, 1))
 
@@ -109,7 +115,7 @@ def get_trainingdata(indicators, scope=1):
   labels = np.array(labels)
   return training, labels
 
-#pipeline of creating a predictor object: obj = predictor(lyrs)
+#pipeline of creating a predictor object: obj = predictor(model_type, lyrs, ...)
 #                                         train on a variety of securities
 #                                         obj.examine_bias(on a security that the estimator is purposed for)
 #                                         ready for making predictions

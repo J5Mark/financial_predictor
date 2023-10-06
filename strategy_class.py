@@ -1,4 +1,6 @@
 #here is all the logic behind strategic decision making
+import alive_progress
+import time
 
 class strategy:
     def __init__(self, squad, *args, **kwargs):
@@ -33,5 +35,28 @@ class strategy:
 
         return shares #shares to buy
 
+class testing_agent:
+    def __init__(self, strat, data, budget=0, shares=0):
+        self.strat = strat #strategy_class.strategy() obj
+        self.data = data #tuple of training data bits as after predictor_class.get_trainingdata()
+        self.budget = budget #just a number, int or float
+        self.squad = self.strat.squad #list of predictor_class.predictor() objs
+        self.shares = shares
+        self.pnls = []
 
-
+    def test_strat(self):
+        with alive_progress.alive_bar(len(self.data[0])-1, force_tty=True, spinner='stars') as bar:
+            for i in range(len(self.data[1])):
+                time.sleep(0.0005)
+                data_bit = self.data[0][i:i+1]
+                price = self.data[1][i-1]
+                # right now is the i moment, in the labels_s` realm it`s i-1st moment
+                shares_now = self.strat.hmbsa(data_bit, price)
+                if shares_now == 0:
+                    self.budget += self.shares*price
+                    self.shares = 0
+                else:
+                    self.shares += shares_now
+                    self.budget -= shares_now*price
+                self.pnls.append(self.budget)
+                bar()
